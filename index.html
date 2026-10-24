@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceship Builder & AI Design Advisor</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter & Orbitron -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #050811;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* Custom Sci-Fi Glassmorphism */
+        .glass-panel {
+            background: rgba(10, 16, 32, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 243, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+        .glass-panel-glow {
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.15);
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 8, 17, 0.8);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 243, 255, 0.3);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 243, 255, 0.6);
+        }
+        /* Neon Accents */
+        .text-neon-cyan { color: #00f3ff; text-shadow: 0 0 8px rgba(0,243,255,0.5); }
+        .text-neon-pink { color: #ff007f; text-shadow: 0 0 8px rgba(255,0,127,0.5); }
+        .text-neon-amber { color: #ffaa00; text-shadow: 0 0 8px rgba(255,170,0,0.5); }
+        .bg-neon-cyan { background-color: #00f3ff; }
+        .border-neon-cyan { border-color: #00f3ff; }
+        
+        .pulse-glow {
+            animation: pulse-animation 2s infinite;
+        }
+        @keyframes pulse-animation {
+            0% { box-shadow: 0 0 0 0px rgba(0, 243, 255, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 243, 255, 0); }
+            100% { box-shadow: 0 0 0 0px rgba(0, 243, 255, 0); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col overflow-hidden select-none">
+
+    <!-- Top Navigation Bar -->
+    <header class="h-14 glass-panel border-b border-cyan-900/50 flex items-center justify-between px-4 z-20 shrink-0">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid font-orbitron fa-rocket text-2xl text-cyan-400 animate-pulse"></i>
+            <div>
+                <h1 class="font-orbitron font-bold text-lg tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400">
+                    AETHERIA <span class="text-xs text-cyan-500 font-normal border border-cyan-800 px-1.5 py-0.5 rounded ml-1">BUILDER v3.5</span>
+                </h1>
+            </div>
+        </div>
+
+        <!-- System Controls & API Status -->
+        <div class="flex items-center space-x-3">
+            <button id="openApiModalBtn" class="flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-semibold glass-panel hover:bg-cyan-950/50 transition-all border border-cyan-500/30">
+                <span id="apiStatusDot" class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                <span id="apiStatusText" class="text-gray-300">API Key: Chưa thiết lập (Mock AI)</span>
+                <i class="fa-solid fa-key text-cyan-400 ml-1"></i>
+            </button>
+
+            <button id="autoOptimizeBtn" class="px-3 py-1.5 rounded-md text-xs font-orbitron font-semibold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-900/30 transition-all flex items-center space-x-1">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <span class="hidden md:inline">Tự Động Tối Ưu</span>
+            </button>
+
+            <button id="exportBlueprintBtn" class="px-3 py-1.5 rounded-md text-xs font-orbitron font-semibold bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/50 text-cyan-300 transition-all flex items-center space-x-1">
+                <i class="fa-solid fa-file-export"></i>
+                <span class="hidden md:inline">Xuất Bản Vẽ</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace (3 Column Grid) -->
+    <main class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+        
+        <!-- Left Panel: Configurator Controls -->
+        <aside class="w-full md:w-80 lg:w-96 glass-panel border-r border-cyan-900/40 flex flex-col z-10 shrink-0 h-1/3 md:h-full overflow-y-auto">
+            <div class="p-3 border-b border-cyan-900/50 flex justify-between items-center bg-cyan-950/20">
+                <h2 class="font-orbitron text-xs font-bold text-cyan-400 tracking-wider flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>TÙY CHỈNH CẤU TRÚC TÀU</span>
+                </h2>
+                <span class="text-[10px] text-gray-400">MODULAR CAD v2.0</span>
+            </div>
+
+            <div class="p-4 space-y-4 text-xs">
+                <!-- Environment Selection -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1 flex justify-between">
+                        <span>Môi Trường Hoạt Động</span>
+                        <i class="fa-solid fa-globe text-cyan-400"></i>
+                    </label>
+                    <select id="envSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400 transition-colors">
+                        <option value="vacuum">Chân Không - Deep Space</option>
+                        <option value="atmosphere">Khí Quyển - Dense Atmosphere</option>
+                        <option value="nebula">Tinh Vân - Radiation Nebula</option>
+                        <option value="solar">Cận Sao - Solar Proximity</option>
+                        <option value="hyperspace">Siêu Không Gian - Hyperspace</option>
+                    </select>
+                </div>
+
+                <!-- Cockpit -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1">Khoang Lái (Cockpit)</label>
+                    <select id="cockpitSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="explorer">Explorer Glass Dome (Thám hiểm)</option>
+                        <option value="stealth">Stealth Angular Visor (Tàng hình)</option>
+                        <option value="heavy">Heavy Armor Reinforced (Bọc thép nặng)</option>
+                        <option value="fighter">Fighter Aerodynamic Canopy (Tác chiến)</option>
+                    </select>
+                </div>
+
+                <!-- Fuselage -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1">Thân Tàu (Fuselage)</label>
+                    <select id="fuselageSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="sleek">Sleek Hydrodynamic Body (Thấp & Nhanh)</option>
+                        <option value="titan">Titan Bulk Composite (Kiên cố)</option>
+                        <option value="cargo">Cargo Frame Array (Vận tải khung lớn)</option>
+                        <option value="modular">Modular Research Core (Khoa học)</option>
+                    </select>
+                </div>
+
+                <!-- Wings -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1">Cánh (Wings)</label>
+                    <select id="wingsSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="delta">Delta Aerofoil (Cánh tam giác linh hoạt)</option>
+                        <option value="swept">Forward Swept Wings (Cánh vát ngược tốc độ)</option>
+                        <option value="heavy">Heavy Shielded Plating (Bọc giáp gia cường)</option>
+                        <option value="solar">Solar Photon Collector Sails (Cánh buồm Mặt Trời)</option>
+                    </select>
+                </div>
+
+                <!-- Engine -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1">Động Cơ (Engine)</label>
+                    <select id="engineSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="ion">Ion Thruster Cluster (Tiết kiệm năng lượng)</option>
+                        <option value="fusion">Fusion Plasma Drive (Công suất lớn)</option>
+                        <option value="warp">Warp Core Matrix (Nhảy không gian)</option>
+                        <option value="twin">Twin Vector Thrusters (Linh hoạt cao)</option>
+                    </select>
+                </div>
+
+                <!-- Module / Weapons -->
+                <div>
+                    <label class="block text-gray-400 font-semibold mb-1">Mô-đun Phụ Trợ / Vũ Khí</label>
+                    <select id="moduleSelect" class="w-full bg-slate-900/90 border border-cyan-800 rounded px-2.5 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="plasma">Pháo Plasma Kép (Twin Plasma Cannons)</option>
+                        <option value="shield">Máy Phát Lá Chắn Năng Lượng High-Capacity</option>
+                        <option value="cargo">Container Kho Hàng Hóa Mở Rộng</option>
+                        <option value="mining">Laser Khai Thác Khoáng Sản Tinh Vân</option>
+                    </select>
+                </div>
+
+                <!-- Colors Customizer -->
+                <div class="pt-2 border-t border-cyan-900/40 grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-400 text-[11px] mb-1">Màu Sơn Chính</label>
+                        <input type="color" id="primaryColorInput" value="#1e293b" class="w-full h-8 bg-transparent cursor-pointer rounded border border-cyan-800 p-0.5">
+                    </div>
+                    <div>
+                        <label class="block text-gray-400 text-[11px] mb-1">Màu Glow/Accent</label>
+                        <input type="color" id="accentColorInput" value="#00f3ff" class="w-full h-8 bg-transparent cursor-pointer rounded border border-cyan-800 p-0.5">
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Panel: 3D Viewport & HUD Stats Overlay -->
+        <div class="flex-1 relative bg-black flex flex-col h-1/3 md:h-full">
+            <!-- 3D Canvas Container -->
+            <div id="canvasContainer" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Viewport Controls Overlay (Top Right of Canvas) -->
+            <div class="absolute top-3 right-3 flex space-x-2 z-10">
+                <button id="resetCamBtn" title="Reset Góc Nhìn" class="p-2 rounded-md glass-panel text-cyan-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-arrows-to-dot"></i>
+                </button>
+                <button id="toggleWireframeBtn" title="Chế Độ Lưới Wireframe" class="p-2 rounded-md glass-panel text-cyan-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-cubes font-bold"></i>
+                </button>
+                <button id="autoRotateBtn" title="Bật/Tắt Tự Xoay" class="p-2 rounded-md glass-panel text-cyan-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-rotate text-emerald-400"></i>
+                </button>
+            </div>
+
+            <!-- Floating HUD Stats Panel (Bottom Center) -->
+            <div class="absolute bottom-3 left-3 right-3 md:left-6 md:right-6 glass-panel rounded-xl p-3 border border-cyan-500/30 z-10">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-center">
+                    <!-- Compatibility Score -->
+                    <div class="col-span-2 sm:col-span-3 md:col-span-2 flex items-center justify-around border-r border-cyan-900/50 pr-2">
+                        <div class="text-left">
+                            <span class="text-[10px] uppercase font-orbitron text-cyan-400 block tracking-wider">Mức Độ Thích Ứng Môi Trường</span>
+                            <span id="compatibilityText" class="text-xl font-orbitron font-extrabold text-emerald-400">92%</span>
+                            <span id="envBadge" class="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 ml-1">Deep Space</span>
+                        </div>
+                        <div class="w-16 h-16 relative flex items-center justify-center">
+                            <svg class="w-16 h-16 transform -rotate-90">
+                                <circle cx="32" cy="32" r="26" stroke="currentColor" stroke-width="4" class="text-slate-800" fill="transparent"/>
+                                <circle id="compatCircle" cx="32" cy="32" r="26" stroke="currentColor" stroke-width="4" class="text-emerald-400" fill="transparent" stroke-dasharray="163" stroke-dashoffset="20"/>
+                            </svg>
+                            <i class="fa-solid fa-shield-halved absolute text-cyan-300 text-sm"></i>
+                        </div>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div>
+                        <span class="text-[10px] text-gray-400 block font-orbitron">TỐC ĐỘ MAX</span>
+                        <span id="statSpeed" class="text-sm font-bold text-cyan-300 font-orbitron">8.4 Mach</span>
+                        <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                            <div id="barSpeed" class="bg-cyan-400 h-full w-3/4"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] text-gray-400 block font-orbitron">GIÁP & LÁ CHẮN</span>
+                        <span id="statShield" class="text-sm font-bold text-indigo-300 font-orbitron">1,200 HP</span>
+                        <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                            <div id="barShield" class="bg-indigo-400 h-full w-1/2"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] text-gray-400 block font-orbitron">NĂNG LƯỢNG</span>
+                        <span id="statEnergy" class="text-sm font-bold text-amber-300 font-orbitron">95% Eff.</span>
+                        <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                            <div id="barEnergy" class="bg-amber-400 h-full w-4/5"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="text-[10px] text-gray-400 block font-orbitron">HỎA LỰC / TIỆN ÍCH</span>
+                        <span id="statFirepower" class="text-sm font-bold text-pink-400 font-orbitron">Class A</span>
+                        <div class="w-full bg-slate-800 h-1 rounded-full mt-1 overflow-hidden">
+                            <div id="barFirepower" class="bg-pink-500 h-full w-2/3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI System Warnings Banner -->
+                <div id="warningBanner" class="mt-2 pt-2 border-t border-cyan-900/40 text-[11px] flex items-center justify-between text-amber-300">
+                    <div class="flex items-center space-x-2 truncate">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-400 animate-bounce"></i>
+                        <span id="warningText">Hệ thống hoạt động bình thường. Không ghi nhận lỗi xung đột môi trường.</span>
+                    </div>
+                    <span class="text-[9px] text-cyan-600 uppercase font-orbitron shrink-0 ml-2">Realtime Diagnostics</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: AI Interactive Chat (Gemini Powered) -->
+        <aside class="w-full md:w-80 lg:w-96 glass-panel border-l border-cyan-900/40 flex flex-col z-10 shrink-0 h-1/3 md:h-full">
+            <div class="p-3 border-b border-cyan-900/50 flex items-center justify-between bg-cyan-950/30">
+                <div class="flex items-center space-x-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-brain text-cyan-400 text-base"></i>
+                        <span class="absolute -top-1 -right-1 flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+                        </span>
+                    </div>
+                    <h2 class="font-orbitron text-xs font-bold text-cyan-300 tracking-wider">AI SPACESHIP ADVISOR</h2>
+                </div>
+                <span class="text-[10px] bg-cyan-900/60 text-cyan-200 px-2 py-0.5 rounded border border-cyan-700 font-orbitron">GEMINI LIVE</span>
+            </div>
+
+            <!-- Chat History Container -->
+            <div id="chatHistory" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+                <!-- Welcome Message -->
+                <div class="flex items-start space-x-2">
+                    <div class="w-6 h-6 rounded-full bg-cyan-900/80 border border-cyan-400 flex items-center justify-center text-cyan-300 text-[10px] shrink-0 mt-0.5">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="glass-panel p-2.5 rounded-lg border-cyan-800 text-slate-200 max-w-[85%]">
+                        <p class="font-semibold text-cyan-400 mb-1">Aetheria AI Copilot</p>
+                        <p>Xin chào kỹ sư! Tôi là trợ lý AI thiết kế tàu vũ trụ. Bạn muốn tạo loại tàu nào hôm nay? Đưa ra ý tưởng (ví dụ: <i>"Thiết kế cho tôi một chiếc tàu thám hiểm tinh vân siêu tốc"</i> hay <i>"Tàu chiến hạng nặng đánh cướp biển"</i>), tôi sẽ tư vấn và <b>tự động thay đổi mô hình 3D</b> cho bạn!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Suggestion Chips -->
+            <div class="p-2 border-t border-cyan-900/30 flex space-x-1 overflow-x-auto text-[10px] no-scrollbar bg-slate-950/40">
+                <button class="chipBtn px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 whitespace-nowrap">🚀 Tàu thám hiểm tinh vân</button>
+                <button class="chipBtn px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 whitespace-nowrap">⚔️ Tàu chiến bọc thép</button>
+                <button class="chipBtn px-2 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 whitespace-nowrap">📦 Tàu vận tải siêu trọng</button>
+            </div>
+
+            <!-- Chat Input Form -->
+            <form id="chatForm" class="p-3 border-t border-cyan-900/50 flex space-x-2 bg-slate-950/80">
+                <input type="text" id="chatInput" placeholder="Yêu cầu AI thiết kế tàu..." class="flex-1 bg-slate-900 border border-cyan-800 rounded px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400">
+                <button type="submit" id="sendBtn" class="px-3 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition-colors flex items-center justify-center">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </form>
+        </aside>
+    </main>
+
+    <!-- Gemini API Key Config Modal -->
+    <div id="apiModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel glass-panel-glow max-w-md w-full rounded-xl p-6 text-slate-200 border-cyan-500/40 relative">
+            <button id="closeApiModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-400 text-xl">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="font-orbitron font-bold text-cyan-300 text-base">Cấu Hình Gemini API Key</h3>
+                    <p class="text-xs text-gray-400">Kết nối với Google AI để mở khóa thiết kế thông minh</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-1">Gemini API Key</label>
+                    <input type="password" id="apiKeyInput" placeholder="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" class="w-full bg-slate-900 border border-cyan-800 rounded px-3 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                    <p class="text-[10px] text-gray-400 mt-1">Key được lưu an toàn trong localStorage trình duyệt của bạn.</p>
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 font-semibold mb-1">Chọn Mô Hình Gemini (Model)</label>
+                    <select id="apiModelSelect" class="w-full bg-slate-900 border border-cyan-800 rounded px-3 py-2 text-cyan-200 focus:outline-none focus:border-cyan-400">
+                        <option value="gemini-2.5-flash">gemini-2.5-flash (Nhanh & Tối ưu - Khuyên dùng)</option>
+                        <option value="gemini-1.5-flash">gemini-1.5-flash (Phiên bản tiêu chuẩn)</option>
+                    </select>
+                </div>
+
+                <div class="p-3 bg-cyan-950/40 rounded border border-cyan-800/60 text-[11px] text-cyan-300">
+                    <p class="font-semibold mb-1"><i class="fa-solid fa-circle-info mr-1"></i> Chưa có API Key?</p>
+                    <p class="text-gray-300">Bạn có thể lấy Google Gemini API Key hoàn toàn miễn phí tại: 
+                        <a href="https://aistudio.google.com/" target="_blank" class="text-cyan-400 underline hover:text-cyan-200 font-semibold">Google AI Studio</a>.
+                    </p>
+                    <p class="mt-1 text-gray-400">Nếu không nhập key, ứng dụng sẽ chạy ở chế độ <b>Mock AI Rules Engine</b> để trải nghiệm thử.</p>
+                </div>
+
+                <div class="flex space-x-2 pt-2">
+                    <button id="saveApiKeyBtn" class="flex-1 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-orbitron font-semibold rounded text-xs transition-all">
+                        Lưu Cấu Hình
+                    </button>
+                    <button id="clearApiKeyBtn" class="px-3 py-2 bg-red-950/80 hover:bg-red-900 border border-red-700 text-red-300 font-semibold rounded text-xs transition-all">
+                        Xóa Key
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical Blueprint Export Modal -->
+    <div id="blueprintModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-2xl w-full rounded-xl p-6 text-slate-200 border-cyan-500/40 relative max-h-[90vh] flex flex-col">
+            <button id="closeBlueprintBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="border-b border-cyan-800/60 pb-3 mb-4 flex justify-between items-center">
+                <div>
+                    <h3 class="font-orbitron font-bold text-cyan-300 text-lg tracking-wider">TECHNICAL BLUEPRINT REPORT</h3>
+                    <p class="text-xs text-gray-400">Bản Vẽ Kỹ Thuật & Cấu Hình Tàu Vũ Trụ Aetheria</p>
+                </div>
+                <span class="text-xs font-orbitron text-cyan-400 border border-cyan-800 px-2 py-1 rounded bg-cyan-950">SEC-CLASS A</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-4 pr-2 text-xs">
+                <!-- Metadata Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-900/80 p-3 rounded border border-cyan-900">
+                    <div><span class="text-gray-400 block">Tên Tàu:</span><span id="bpShipName" class="font-bold text-cyan-300 font-orbitron">AETHER-X1</span></div>
+                    <div><span class="text-gray-400 block">Môi Trường Target:</span><span id="bpEnv" class="font-bold text-emerald-400">Deep Space</span></div>
+                    <div><span class="text-gray-400 block">Thích Ứng Môi Trường:</span><span id="bpCompat" class="font-bold text-cyan-400">92%</span></div>
+                    <div><span class="text-gray-400 block">Tốc Độ Max:</span><span id="bpSpeed" class="font-bold text-slate-200">8.4 Mach</span></div>
+                    <div><span class="text-gray-400 block">Lá Chắn / Giáp:</span><span id="bpShield" class="font-bold text-slate-200">1200 HP</span></div>
+                    <div><span class="text-gray-400 block">Thời Gian Xuất:</span><span id="bpDate" class="font-bold text-slate-200">2026-10-24</span></div>
+                </div>
+
+                <!-- Config Detail JSON -->
+                <div>
+                    <h4 class="font-orbitron font-semibold text-cyan-400 mb-1">Cấu Hình Mô-đun Lắp Ráp:</h4>
+                    <pre id="bpJsonCode" class="bg-black/80 border border-cyan-950 p-3 rounded font-mono text-[11px] text-cyan-300 overflow-x-auto"></pre>
+                </div>
+
+                <!-- AI Assessment -->
+                <div>
+                    <h4 class="font-orbitron font-semibold text-cyan-400 mb-1">Đánh Giá Kỹ Thuật (Diagnostic Summary):</h4>
+                    <p id="bpDiagnostics" class="bg-slate-900/60 p-3 rounded border border-cyan-900/50 text-gray-300 leading-relaxed"></p>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-cyan-900 flex justify-end space-x-2">
+                <button id="copyBlueprintJsonBtn" class="px-4 py-2 bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-300 font-orbitron font-semibold rounded text-xs transition-all">
+                    <i class="fa-solid fa-copy mr-1"></i> Sao Chép JSON
+                </button>
+                <button id="printBlueprintBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-orbitron font-semibold rounded text-xs transition-all">
+                    <i class="fa-solid fa-print mr-1"></i> In / Tải Bản Vẽ PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // --- GLOBAL STATE ---
+        const state = {
+            apiKey: localStorage.getItem('gemini_api_key') || '',
+            apiModel: localStorage.getItem('gemini_api_model') || 'gemini-2.5-flash',
+            shipConfig: {
+                cockpit: 'explorer',
+                fuselage: 'sleek',
+                wings: 'delta',
+                engine: 'ion',
+                module: 'plasma',
+                primaryColor: '#1e293b',
+                accentColor: '#00f3ff',
+                environment: 'vacuum'
+            },
+            wireframe: false,
+            autoRotate: true
+        };
+
+        // --- THREE.JS SCENE SETUP ---
+        let scene, camera, renderer, controls;
+        let shipGroup, cockpitMesh, fuselageMesh, wingLeftMesh, wingRightMesh, engineMesh, moduleMesh, glowLights = [];
+        let particleSystem;
+
+        function init3D() {
+            const container = document.getElementById('canvasContainer');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x050811, 0.015);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(8, 5, 12);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 30;
+            controls.minDistance = 4;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight1 = new THREE.DirectionalLight(0x00f3ff, 1.2);
+            dirLight1.position.set(10, 20, 15);
+            scene.add(dirLight1);
+
+            const dirLight2 = new THREE.DirectionalLight(0xff007f, 0.8);
+            dirLight2.position.set(-10, -10, -10);
+            scene.add(dirLight2);
+
+            // Ship Root Group
+            shipGroup = new THREE.Group();
+            scene.add(shipGroup);
+
+            // Environment Background Particles
+            createSpaceEnvironment();
+
+            // Build Initial Ship
+            rebuildShipModel();
+
+            // Handle Resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Start Render Loop
+            animate();
+        }
+
+        // --- DYNAMIC MODULAR SHIP 3D GENERATOR ---
+        function rebuildShipModel() {
+            // Clear existing ship meshes
+            while(shipGroup.children.length > 0) { 
+                const obj = shipGroup.children[0];
+                if(obj.geometry) obj.geometry.dispose();
+                shipGroup.remove(obj); 
+            }
+            glowLights = [];
+
+            const primaryMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(state.shipConfig.primaryColor),
+                roughness: 0.3,
+                metalness: 0.8,
+                wireframe: state.wireframe
+            });
+
+            const accentMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(state.shipConfig.accentColor),
+                emissive: new THREE.Color(state.shipConfig.accentColor),
+                emissiveIntensity: 0.6,
+                roughness: 0.2,
+                wireframe: state.wireframe
+            });
+
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0x00f3ff,
+                transparent: true,
+                opacity: 0.6,
+                roughness: 0.1,
+                transmission: 0.9,
+                thickness: 0.5,
+                wireframe: state.wireframe
+            });
+
+            // 1. FUSELAGE (Thân Tàu)
+            let fuseGeo;
+            switch(state.shipConfig.fuselage) {
+                case 'sleek':
+                    fuseGeo = new THREE.ConeGeometry(0.8, 4, 8);
+                    fuseGeo.rotateX(Math.PI / 2);
+                    break;
+                case 'titan':
+                    fuseGeo = new THREE.BoxGeometry(1.4, 1.2, 4);
+                    break;
+                case 'cargo':
+                    fuseGeo = new THREE.CylinderGeometry(1, 1, 4.5, 6);
+                    fuseGeo.rotateX(Math.PI / 2);
+                    break;
+                case 'modular':
+                default:
+                    fuseGeo = new THREE.OctahedronGeometry(1.2, 2);
+                    fuseGeo.scale(0.8, 0.8, 2);
+                    break;
+            }
+            fuselageMesh = new THREE.Mesh(fuseGeo, primaryMat);
+            shipGroup.add(fuselageMesh);
+
+            // 2. COCKPIT (Khoang Lái)
+            let cockGeo;
+            switch(state.shipConfig.cockpit) {
+                case 'explorer':
+                    cockGeo = new THREE.SphereGeometry(0.65, 16, 16);
+                    break;
+                case 'stealth':
+                    cockGeo = new THREE.ConeGeometry(0.5, 1.5, 4);
+                    cockGeo.rotateX(Math.PI / 2);
+                    break;
+                case 'heavy':
+                    cockGeo = new THREE.BoxGeometry(0.9, 0.7, 1.2);
+                    break;
+                case 'fighter':
+                default:
+                    cockGeo = new THREE.CapsuleGeometry(0.4, 1, 4, 8);
+                    cockGeo.rotateX(Math.PI / 2);
+                    break;
+            }
+            cockpitMesh = new THREE.Mesh(cockGeo, glassMat);
+            cockpitMesh.position.set(0, 0.4, 1.3);
+            shipGroup.add(cockpitMesh);
+
+            // 3. WINGS (Cánh)
+            const wingsGroup = new THREE.Group();
+            let wingShapeGeom;
+
+            switch(state.shipConfig.wings) {
+                case 'delta':
+                    wingShapeGeom = new THREE.BufferGeometry();
+                    const deltaVerts = new Float32Array([
+                        0, 0, 0,   3, 0, -1,   0, 0, -2,
+                        0, 0, 0,  -3, 0, -1,   0, 0, -2
+                    ]);
+                    wingShapeGeom.setAttribute('position', new THREE.BufferAttribute(deltaVerts, 3));
+                    wingShapeGeom.computeVertexNormals();
+                    wingLeftMesh = new THREE.Mesh(wingShapeGeom, primaryMat);
+                    wingsGroup.add(wingLeftMesh);
+                    break;
+                case 'swept':
+                    const sweptBox = new THREE.BoxGeometry(4.5, 0.1, 0.8);
+                    sweptBox.rotateY(-0.3);
+                    wingLeftMesh = new THREE.Mesh(sweptBox, primaryMat);
+                    wingsGroup.add(wingLeftMesh);
+                    break;
+                case 'heavy':
+                    const heavyWing = new THREE.BoxGeometry(3.6, 0.4, 1.5);
+                    wingLeftMesh = new THREE.Mesh(heavyWing, primaryMat);
+                    wingsGroup.add(wingLeftMesh);
+                    break;
+                case 'solar':
+                default:
+                    const sailGeo = new THREE.PlaneGeometry(5, 1.8);
+                    wingLeftMesh = new THREE.Mesh(sailGeo, accentMat);
+                    wingLeftMesh.rotation.x = -Math.PI / 4;
+                    wingsGroup.add(wingLeftMesh);
+                    break;
+            }
+            wingsGroup.position.set(0, 0, -0.2);
+            shipGroup.add(wingsGroup);
+
+            // 4. ENGINE (Động Cơ)
+            const engineGroup = new THREE.Group();
+            let engGeo = new THREE.CylinderGeometry(0.4, 0.6, 1.2, 12);
+            engGeo.rotateX(Math.PI / 2);
+
+            if(state.shipConfig.engine === 'twin') {
+                const eng1 = new THREE.Mesh(engGeo, primaryMat);
+                eng1.position.set(-0.6, 0, -2.2);
+                const eng2 = new THREE.Mesh(engGeo, primaryMat);
+                eng2.position.set(0.6, 0, -2.2);
+                engineGroup.add(eng1, eng2);
+            } else {
+                const engMain = new THREE.Mesh(engGeo, primaryMat);
+                engMain.position.set(0, 0, -2.2);
+                engineGroup.add(engMain);
+            }
+
+            // Engine Glow Effect
+            const glowGeo = new THREE.SphereGeometry(0.35, 12, 12);
+            const glowMesh = new THREE.Mesh(glowGeo, accentMat);
+            glowMesh.position.set(0, 0, -2.7);
+            engineGroup.add(glowMesh);
+
+            const engineLight = new THREE.PointLight(new THREE.Color(state.shipConfig.accentColor), 2, 8);
+            engineLight.position.set(0, 0, -2.8);
+            engineGroup.add(engineLight);
+
+            shipGroup.add(engineGroup);
+
+            // 5. MODULE / WEAPONS
+            const moduleGroup = new THREE.Group();
+            if(state.shipConfig.module === 'plasma') {
+                const cannonGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.8, 8);
+                cannonGeo.rotateX(Math.PI / 2);
+                const c1 = new THREE.Mesh(cannonGeo, accentMat);
+                c1.position.set(1.2, -0.2, 0.5);
+                const c2 = new THREE.Mesh(cannonGeo, accentMat);
+                c2.position.set(-1.2, -0.2, 0.5);
+                moduleGroup.add(c1, c2);
+            } else if(state.shipConfig.module === 'shield') {
+                const ringGeo = new THREE.TorusGeometry(1.6, 0.06, 8, 24);
+                const ring = new THREE.Mesh(ringGeo, accentMat);
+                moduleGroup.add(ring);
+            } else if(state.shipConfig.module === 'cargo') {
+                const containerGeo = new THREE.BoxGeometry(1.8, 0.8, 1.2);
+                const container = new THREE.Mesh(containerGeo, primaryMat);
+                container.position.set(0, -0.8, 0);
+                moduleGroup.add(container);
+            }
+            shipGroup.add(moduleGroup);
+
+            // Update UI Stats whenever model rebuilds
+            updateShipDiagnostics();
+        }
+
+        // --- SPACE BACKGROUND PARTICLES ---
+        function createSpaceEnvironment() {
+            if(particleSystem) scene.remove(particleSystem);
+
+            const particleCount = 1200;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            let envColor = new THREE.Color(0x00f3ff);
+            if(state.shipConfig.environment === 'nebula') envColor = new THREE.Color(0xff007f);
+            if(state.shipConfig.environment === 'solar') envColor = new THREE.Color(0xffaa00);
+            if(state.shipConfig.environment === 'hyperspace') envColor = new THREE.Color(0x3b82f6);
+
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 80;
+                positions[i + 1] = (Math.random() - 0.5) * 80;
+                positions[i + 2] = (Math.random() - 0.5) * 80;
+
+                colors[i] = envColor.r * Math.random();
+                colors[i + 1] = envColor.g * Math.random();
+                colors[i + 2] = envColor.b * Math.random();
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.3,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+
+            // Adjust Fog based on environment
+            if(state.shipConfig.environment === 'nebula') {
+                scene.fog.color.setHex(0x2a0825);
+                scene.fog.density = 0.03;
+            } else if(state.shipConfig.environment === 'solar') {
+                scene.fog.color.setHex(0x2a1500);
+                scene.fog.density = 0.025;
+            } else {
+                scene.fog.color.setHex(0x050811);
+                scene.fog.density = 0.015;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if(controls) controls.update();
+
+            // Ship Idle Animation
+            if(shipGroup) {
+                if(state.autoRotate) {
+                    shipGroup.rotation.y += 0.005;
+                }
+                shipGroup.position.y = Math.sin(Date.now() * 0.0015) * 0.15;
+            }
+
+            // Rotate Particles
+            if(particleSystem) {
+                particleSystem.rotation.y += 0.0005;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvasContainer');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- DIAGNOSTICS & SUITABILITY ENGINE ---
+        function updateShipDiagnostics() {
+            let speed = 5.0; // Mach
+            let shield = 800; // HP
+            let energy = 80; // %
+            let firepower = 'Class C';
+            let compatibility = 100;
+            let warnings = [];
+
+            const c = state.shipConfig;
+
+            // Stats calculation based on module combos
+            if(c.fuselage === 'sleek') speed += 3.0;
+            if(c.wings === 'swept') speed += 2.5;
+            if(c.engine === 'warp') speed += 4.0;
+            if(c.fuselage === 'titan') { speed -= 1.5; shield += 600; }
+            if(c.cockpit === 'heavy') shield += 400;
+            if(c.module === 'shield') shield += 800;
+            if(c.engine === 'ion') energy += 15;
+            if(c.wings === 'solar') energy += 20;
+
+            if(c.module === 'plasma') firepower = 'Class S';
+            if(c.module === 'mining') firepower = 'Utility B';
+
+            // Environment Compatibility Checks & Warnings
+            if(c.environment === 'solar') {
+                if(c.cockpit !== 'heavy' && c.wings !== 'heavy') {
+                    compatibility -= 35;
+                    warnings.push('CẢNH BÁO: Thiếu lá chắn nhiệt/giáp nặng! Nguy cơ quá nhiệt khi cận sao.');
+                }
+                if(c.wings === 'solar') compatibility += 15;
+            }
+
+            if(c.environment === 'nebula') {
+                if(c.module !== 'shield') {
+                    compatibility -= 25;
+                    warnings.push('CẢNH BÁO: Bức xạ Tinh Vân gây nhiễu điện tử. Khuyên dùng Máy Phát Lá Chắn.');
+                }
+            }
+
+            if(c.environment === 'atmosphere') {
+                if(c.wings === 'solar' || c.fuselage === 'cargo') {
+                    compatibility -= 30;
+                    warnings.push('CẢNH BÁO: Khí quyển dày gây cản gió cao đối với khung vuông/cánh buồm!');
+                }
+            }
+
+            if(c.environment === 'hyperspace') {
+                if(c.engine !== 'warp') {
+                    compatibility -= 40;
+                    warnings.push('CẢNH BÁO: Cần Động Cơ Warp Matrix để duy trì gia tốc Siêu Không Gian!');
+                }
+            }
+
+            compatibility = Math.max(10, Math.min(100, compatibility));
+
+            // Update UI HUD
+            document.getElementById('statSpeed').innerText = `${speed.toFixed(1)} Mach`;
+            document.getElementById('statShield').innerText = `${shield} HP`;
+            document.getElementById('statEnergy').innerText = `${Math.min(100, energy)}% Eff.`;
+            document.getElementById('statFirepower').innerText = firepower;
+
+            document.getElementById('compatibilityText').innerText = `${compatibility}%`;
+            document.getElementById('compatCircle').style.strokeDashoffset = 163 - (163 * compatibility / 100);
+
+            const envBadge = document.getElementById('envBadge');
+            envBadge.innerText = document.getElementById('envSelect').options[document.getElementById('envSelect').selectedIndex].text.split('-')[0];
+
+            const warningText = document.getElementById('warningText');
+            if(warnings.length > 0) {
+                warningText.innerText = warnings.join(' | ');
+                document.getElementById('warningBanner').className = 'mt-2 pt-2 border-t border-red-900/40 text-[11px] flex items-center justify-between text-red-400 font-semibold';
+            } else {
+                warningText.innerText = 'Hệ thống tối ưu hoàn hảo cho môi trường hiện tại.';
+                document.getElementById('warningBanner').className = 'mt-2 pt-2 border-t border-cyan-900/40 text-[11px] flex items-center justify-between text-emerald-400';
+            }
+        }
+
+        // --- GEMINI API INTEGRATION & CHAT ENGINE ---
+        const SYSTEM_PROMPT = `Bạn là Aetheria AI Copilot - Trợ lý Kỹ sư hàng không vũ trụ cao cấp.
+Nhiệm vụ của bạn: Tư vấn thiết kế tàu vũ trụ dựa trên yêu cầu của người dùng và TRẢ VỀ CẤU HÌNH TÀU dưới dạng JSON ở CUỐI CÂU TRẢ LỜI.
+
+MÔ TẢ VỀ MÔ-ĐUN HỢP LỆ (BẮT BUỘC CHỌN TỪ BẢNG DƯỚI ĐÂY):
+- cockpit: "explorer", "stealth", "heavy", "fighter"
+- fuselage: "sleek", "titan", "cargo", "modular"
+- wings: "delta", "swept", "heavy", "solar"
+- engine: "ion", "fusion", "warp", "twin"
+- module: "plasma", "shield", "cargo", "mining"
+- environment: "vacuum", "atmosphere", "nebula", "solar", "hyperspace"
+- primaryColor: Mã màu Hex (ví dụ: "#1e293b")
+- accentColor: Mã màu Hex Glow (ví dụ: "#00f3ff")
+
+CẤU TRÚC PHÂN TRẢ LỜI:
+1. Đưa ra lời tư vấn ngắn gọn, chuyên nghiệp, chuẩn sci-fi (2-4 câu).
+2. Cuối văn bản, thêm duy nhất 1 khối JSON dạng:
+\`\`\`json
+{
+  "cockpit": "heavy",
+  "fuselage": "titan",
+  "wings": "heavy",
+  "engine": "fusion",
+  "module": "plasma",
+  "primaryColor": "#0f172a",
+  "accentColor": "#ff0055",
+  "environment": "solar"
+}
+\`\`\``;
+
+        async function handleUserChat(userMessage) {
+            appendChatMessage('user', userMessage);
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i>`;
+
+            if(state.apiKey) {
+                // Call Google Gemini API
+                try {
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${state.apiModel}:generateContent?key=${state.apiKey}`;
+                    const payload = {
+                        contents: [
+                            { role: 'user', parts: [{ text: userMessage }] }
+                        ],
+                        systemInstruction: {
+                            parts: [{ text: SYSTEM_PROMPT }]
+                        }
+                    };
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if(!response.ok) {
+                        throw new Error(`API Error: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Không thể phân tích phản hồi từ Gemini.";
+                    
+                    processAiResponse(aiText);
+
+                } catch (err) {
+                    console.error(err);
+                    appendChatMessage('ai', `⚠️ Lỗi kết nối Gemini API (${err.message}). Đang chuyển sang Fallback Mock AI...`);
+                    runMockAiResponse(userMessage);
+                }
+            } else {
+                // Fallback Mock AI Engine
+                setTimeout(() => {
+                    runMockAiResponse(userMessage);
+                }, 800);
+            }
+
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane"></i>`;
+        }
+
+        function runMockAiResponse(userMessage) {
+            const msg = userMessage.toLowerCase();
+            let newConfig = { ...state.shipConfig };
+            let responseText = "";
+
+            if(msg.includes('thám hiểm') || msg.includes('tinh vân') || msg.includes('nebula')) {
+                newConfig = {
+                    cockpit: 'explorer',
+                    fuselage: 'modular',
+                    wings: 'solar',
+                    engine: 'ion',
+                    module: 'shield',
+                    primaryColor: '#0f172a',
+                    accentColor: '#00f3ff',
+                    environment: 'nebula'
+                };
+                responseText = "Tôi đã tối ưu hóa tàu cho nhiệm vụ thám hiểm Tinh Vân Bức Xạ. Đã trang bị Kính Thám Hiểm 360°, Máy Phát Lá Chắn Bức Xạ và Cánh Bắt Hạt Photon!";
+            } else if(msg.includes('chiến') || msg.includes('cướp biển') || msg.includes('bọc thép') || msg.includes('súng')) {
+                newConfig = {
+                    cockpit: 'heavy',
+                    fuselage: 'titan',
+                    wings: 'heavy',
+                    engine: 'fusion',
+                    module: 'plasma',
+                    primaryColor: '#1e1b4b',
+                    accentColor: '#ff0055',
+                    environment: 'vacuum'
+                };
+                responseText = "Chuyển sang cấu hình Tác Chiến Hạng Hạng Nặng! Khung Titan gia cường, trang bị Pháo Plasma Kép và Động Cơ Plasma Đôi sẵn sàng xung trận.";
+            } else if(msg.includes('vận tải') || msg.includes('chở hàng') || msg.includes('cargo')) {
+                newConfig = {
+                    cockpit: 'heavy',
+                    fuselage: 'cargo',
+                    wings: 'delta',
+                    engine: 'twin',
+                    module: 'cargo',
+                    primaryColor: '#334155',
+                    accentColor: '#f59e0b',
+                    environment: 'vacuum'
+                };
+                responseText = "Cấu hình Vận Tải Hàng Hóa Mở Rộng đã sẵn sàng. Tăng dung tích kho chứa tối đa, tối ưu hóa mức tiêu thụ năng lượng cho hành trình dài.";
+            } else {
+                newConfig = {
+                    cockpit: 'stealth',
+                    fuselage: 'sleek',
+                    wings: 'swept',
+                    engine: 'warp',
+                    module: 'plasma',
+                    primaryColor: '#020617',
+                    accentColor: '#10b981',
+                    environment: 'hyperspace'
+                };
+                responseText = "Cấu hình Tàng Hình Siêu Tốc đã cập nhật. Tối ưu cho gia tốc Siêu Không Gian và di chuyển ẩn danh trong vùng thù địch.";
+            }
+
+            const fullAiText = `${responseText}\n\`\`\`json\n${JSON.stringify(newConfig, null, 2)}\n\`\`\``;
+            processAiResponse(fullAiText);
+        }
+
+        function processAiResponse(fullText) {
+            // Extract JSON block if present
+            const jsonMatch = fullText.match(/```json\n([\s\S]*?)\n```/) || fullText.match(/\{[\s\S]*\}/);
+            let textClean = fullText.replace(/```json\n[\s\S]*?\n```/g, '').trim();
+
+            if (jsonMatch) {
+                try {
+                    const parsedConfig = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+                    applyNewConfig(parsedConfig);
+                } catch(e) {
+                    console.warn("Could not parse AI JSON config", e);
+                }
+            }
+
+            appendChatMessage('ai', textClean);
+        }
+
+        function applyNewConfig(newCfg) {
+            Object.assign(state.shipConfig, newCfg);
+
+            // Update DOM Controls
+            document.getElementById('cockpitSelect').value = state.shipConfig.cockpit;
+            document.getElementById('fuselageSelect').value = state.shipConfig.fuselage;
+            document.getElementById('wingsSelect').value = state.shipConfig.wings;
+            document.getElementById('engineSelect').value = state.shipConfig.engine;
+            document.getElementById('moduleSelect').value = state.shipConfig.module;
+            document.getElementById('envSelect').value = state.shipConfig.environment;
+            document.getElementById('primaryColorInput').value = state.shipConfig.primaryColor;
+            document.getElementById('accentColorInput').value = state.shipConfig.accentColor;
+
+            // Update 3D & Particles
+            rebuildShipModel();
+            createSpaceEnvironment();
+        }
+
+        function appendChatMessage(role, message) {
+            const history = document.getElementById('chatHistory');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex items-start space-x-2 ${role === 'user' ? 'justify-end' : ''}`;
+
+            if(role === 'user') {
+                msgDiv.innerHTML = `
+                    <div class="bg-cyan-600/80 p-2.5 rounded-lg text-white max-w-[85%] font-medium">
+                        ${escapeHtml(message)}
+                    </div>
+                    <div class="w-6 h-6 rounded-full bg-cyan-500 flex items-center justify-center text-white text-[10px] shrink-0 mt-0.5">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                `;
+            } else {
+                msgDiv.innerHTML = `
+                    <div class="w-6 h-6 rounded-full bg-cyan-900/80 border border-cyan-400 flex items-center justify-center text-cyan-300 text-[10px] shrink-0 mt-0.5">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="glass-panel p-2.5 rounded-lg border-cyan-800 text-slate-200 max-w-[85%]">
+                        <p class="font-semibold text-cyan-400 mb-1">Aetheria AI Copilot</p>
+                        <p>${escapeHtml(message)}</p>
+                    </div>
+                `;
+            }
+
+            history.appendChild(msgDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // --- UI EVENT BINDINGS & LISTENERS ---
+        function bindEvents() {
+            // Config Selects
+            const selects = ['cockpitSelect', 'fuselageSelect', 'wingsSelect', 'engineSelect', 'moduleSelect'];
+            selects.forEach(id => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    const key = id.replace('Select', '');
+                    state.shipConfig[key] = e.target.value;
+                    rebuildShipModel();
+                });
+            });
+
+            // Color Inputs
+            document.getElementById('primaryColorInput').addEventListener('input', (e) => {
+                state.shipConfig.primaryColor = e.target.value;
+                rebuildShipModel();
+            });
+            document.getElementById('accentColorInput').addEventListener('input', (e) => {
+                state.shipConfig.accentColor = e.target.value;
+                rebuildShipModel();
+            });
+
+            // Environment
+            document.getElementById('envSelect').addEventListener('change', (e) => {
+                state.shipConfig.environment = e.target.value;
+                createSpaceEnvironment();
+                updateShipDiagnostics();
+            });
+
+            // 3D Viewport Controls
+            document.getElementById('resetCamBtn').addEventListener('click', () => {
+                camera.position.set(8, 5, 12);
+                controls.target.set(0, 0, 0);
+            });
+            document.getElementById('toggleWireframeBtn').addEventListener('click', () => {
+                state.wireframe = !state.wireframe;
+                rebuildShipModel();
+            });
+            document.getElementById('autoRotateBtn').addEventListener('click', (e) => {
+                state.autoRotate = !state.autoRotate;
+                e.currentTarget.classList.toggle('text-emerald-400');
+            });
+
+            // Chat Form Submit
+            document.getElementById('chatForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const input = document.getElementById('chatInput');
+                const val = input.value.trim();
+                if(val) {
+                    handleUserChat(val);
+                    input.value = '';
+                }
+            });
+
+            // Quick Chips
+            document.querySelectorAll('.chipBtn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const promptText = btn.innerText.replace(/^[^\s]+\s/, '');
+                    handleUserChat(`Thiết kế cho tôi một chiếc ${promptText}`);
+                });
+            });
+
+            // API Modal
+            const apiModal = document.getElementById('apiModal');
+            document.getElementById('openApiModalBtn').addEventListener('click', () => apiModal.classList.remove('hidden'));
+            document.getElementById('closeApiModalBtn').addEventListener('click', () => apiModal.classList.add('hidden'));
+
+            document.getElementById('saveApiKeyBtn').addEventListener('click', () => {
+                const key = document.getElementById('apiKeyInput').value.trim();
+                const model = document.getElementById('apiModelSelect').value;
+                state.apiKey = key;
+                state.apiModel = model;
+                localStorage.setItem('gemini_api_key', key);
+                localStorage.setItem('gemini_api_model', model);
+                updateApiStatusUI();
+                apiModal.classList.add('hidden');
+            });
+
+            document.getElementById('clearApiKeyBtn').addEventListener('click', () => {
+                state.apiKey = '';
+                localStorage.removeItem('gemini_api_key');
+                document.getElementById('apiKeyInput').value = '';
+                updateApiStatusUI();
+                apiModal.classList.add('hidden');
+            });
+
+            // Auto Optimize Button
+            document.getElementById('autoOptimizeBtn').addEventListener('click', () => {
+                const env = state.shipConfig.environment;
+                handleUserChat(`Tự động tối ưu hóa thiết kế tàu vũ trụ này để đạt mức thích ứng 100% trong môi trường ${env}.`);
+            });
+
+            // Blueprint Modal
+            const blueprintModal = document.getElementById('blueprintModal');
+            document.getElementById('exportBlueprintBtn').addEventListener('click', () => {
+                document.getElementById('bpShipName').innerText = `AETHER-${Math.floor(Math.random()*8999+1000)}`;
+                document.getElementById('bpEnv').innerText = state.shipConfig.environment.toUpperCase();
+                document.getElementById('bpCompat').innerText = document.getElementById('compatibilityText').innerText;
+                document.getElementById('bpSpeed').innerText = document.getElementById('statSpeed').innerText;
+                document.getElementById('bpShield').innerText = document.getElementById('statShield').innerText;
+                document.getElementById('bpDate').innerText = new Date().toISOString().split('T')[0];
+
+                document.getElementById('bpJsonCode').innerText = JSON.stringify(state.shipConfig, null, 2);
+                document.getElementById('bpDiagnostics').innerText = document.getElementById('warningText').innerText;
+
+                blueprintModal.classList.remove('hidden');
+            });
+
+            document.getElementById('closeBlueprintBtn').addEventListener('click', () => blueprintModal.classList.add('hidden'));
+
+            document.getElementById('copyBlueprintJsonBtn').addEventListener('click', () => {
+                const code = JSON.stringify(state.shipConfig, null, 2);
+                navigator.clipboard.writeText(code);
+                alert("Đã sao chép cấu hình JSON vào Clipboard!");
+            });
+
+            document.getElementById('printBlueprintBtn').addEventListener('click', () => {
+                window.print();
+            });
+        }
+
+        function updateApiStatusUI() {
+            const dot = document.getElementById('apiStatusDot');
+            const text = document.getElementById('apiStatusText');
+            if(state.apiKey) {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+                text.innerText = `API Key: Đã kết nối (${state.apiModel})`;
+            } else {
+                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+                text.innerText = "API Key: Chưa thiết lập (Mock AI)";
+            }
+        }
+
+        // --- APP INITIALIZATION ---
+        window.onload = () => {
+            init3D();
+            bindEvents();
+
+            if(state.apiKey) {
+                document.getElementById('apiKeyInput').value = state.apiKey;
+                document.getElementById('apiModelSelect').value = state.apiModel;
+            }
+            updateApiStatusUI();
+        };
+    </script>
+</body>
+</html>
